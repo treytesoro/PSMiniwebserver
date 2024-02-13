@@ -1,1 +1,28 @@
-<h2>test from index</h2>
+<html>
+    <head>
+        <title>Example</title>
+    </head>
+    <body>
+        <h1>TEST index file</h1>
+
+        <h2>JSON data from api request:</h2>
+        <span id="firstname"></span>
+        <span id="lastname"></span>
+    </body>
+
+    <script>
+        // As an example, let's request some JSON data from our /examplejson route
+        var xmlreq = new XMLHttpRequest();
+        xmlreq.onreadystatechange = function() {
+            xmlreq.onreadystatechange = function () {
+                if (this.readyState == 4 && this.status == 200) {
+                    var data = JSON.parse(this.responseText);
+                    document.getElementById("firstname").innerText=data.firstname;
+                    document.getElementById("lastname").innerText=data.lastname;
+                }
+            }
+        }
+        xmlreq.open("GET", "http://localhost:9797/examplejson");
+        xmlreq.send();
+    </script>
+</html>
