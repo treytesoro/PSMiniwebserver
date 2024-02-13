@@ -1,27 +1,25 @@
-param (
-    [bool]$relaunched
-)
-Set-Location $PSScriptRoot
-if(!$relaunched) {
-    Write-Host "Relaunching...";
-    Start-Process -Verb RunAs powershell.exe  -ArgumentList "-NoExit -Command `"$($PSCommandPath)`" -relaunched `$True";
-    Exit;
-}
+# aztest.ps1
 
-# Let's test some Azure cmdlet stuff
-# Connect-AzAccount # only need this once
-Connect-MgGraph
+You'll need the current Az module (NOT AzureRM - that's deprecated).
 
-$host.UI.RawUI.WindowTitle = "Mini Web Server Example";
+Check out Microsoft Docs for more info: [Installing Az Module](https://learn.microsoft.com/en-us/powershell/azure/install-azps-windows?view=azps-11.3.0&tabs=powershell&pivots=windows-psgallery)
 
-# First we must import the miniserver module
-Import-Module ..\..\miniserver.psm1 -Force;
+Once installed you'll need to connect before running aztest.ps1
 
-########################################################################################
-# Define scriptblocks for our routes.
-# Route scriptblocks will receive the current request and response objects when called.
-########################################################################################
+` Connect-AzAccount`
 
+
+You will also need the official Microsoft Graph PowerShell Module - MgGraph (NOT MsGraph)
+
+Check out this document for installing MgGraph: [Installing MgGraph](https://learn.microsoft.com/en-us/powershell/microsoftgraph/installation?view=graph-powershell-1.0#installation)
+
+The aztest.ps1 script will attempt to start an mggraph session using `Connect-MgGraph`, you may be prompted to login again.
+
+## Quick explanation
+
+We're using the following for the `/` (index) page scriptblock:
+
+```
 $index_Route = {
     param(
         $Request,
@@ -30,12 +28,12 @@ $index_Route = {
 
     # You can do something like:
     # New-MiniServerHtmlSingleQuery -Headers "DisplayName", "UPN", "Id" -Url "http://localhost:9797/az" -Queryparameter "username" | Out-File .\test.html
-    
+
     # Then use that file for output
     # $output = Get-Content -Path ".\test.html" -Encoding UTF8 -Raw;
 
     # Or you can just generate the html on the fly and output that.
-     # http://localhost:9797/az URL, represented by $az_Route scripblock, expects "username" for its query.
+    # http://localhost:9797/az URL, represented by $az_Route scripblock, expects "username" for its query.
     $output = New-MiniServerHtmlSingleQuery -Headers "DisplayName", "UPN", "Id" -Url "http://localhost:9797/az" -Queryparameter "username";
 
     $Response.StatusCode = 200;
@@ -47,30 +45,11 @@ $index_Route = {
     $sw.Write($output);
     $sw.Close();
 }
+```
 
-$examplejson_Route = {
-    param(
-        $Request,
-        $Response
-    )
+And the following for the `/az` endpoint scriptblock
 
-    $exampledatahash = @{
-        "firstname"="John";
-        "lastname"="Doe";
-    };
-
-    $output = ConvertTo-Json -InputObject $exampledatahash;
-
-    $Response.StatusCode = 200;
-    $Response.ContentLength64 = $output.Length;
-    $Response.ContentType = "application/Json";
-
-    # Write JSON data to outputstream
-    [System.IO.StreamWriter] $sw = [System.IO.StreamWriter]::new($Response.OutputStream);
-    $sw.Write($output);
-    $sw.Close();
-}
-
+```
 $az_Route = {
     param(
         $Request,
@@ -105,14 +84,4 @@ $az_Route = {
     $sw.Write($output);
     $sw.Close();
 }
-
-# Register web server routes
-Set-MiniServerRoute -RoutePath "/" -ScriptBlock $index_Route;
-Set-MiniServerRoute -RoutePath "/examplejson" -ScriptBlock $examplejson_Route;
-Set-MiniServerRoute -RoutePath "/az" -ScriptBlock $az_Route;
-
-# Start the web server
-Start-MiniServer -Hostname "localhost" -Port "9797";
-
-# Open url in default browser
-Start-Process "http://localhost:9797"
+```
