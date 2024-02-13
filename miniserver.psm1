@@ -165,4 +165,66 @@ New-Module -Name PodgeModule -ScriptBlock {
     function Get-MiniServerRoutes {
         Return $routes;
     }
+
+    # DO NOT USE YET - STILL WORKING ON THIS
+    function New-MiniServerHtml {
+        param(
+            [string[]]$Headers,
+            [string]$Url
+        )
+
+        $htmlstring = @"
+<html>
+<head>
+    <title>Table</title>
+<script>
+addEventListener("DOMContentLoaded", (event) => {
+    document.getElementById("getdata").addEventListener("click", (event) => {
+        fetch("{URL}").then((response) => {
+            response.json().then((data) => {
+                console.log(data);
+                let tablerows = document.getElementById("rows");
+                for(let dr in data) {
+                    let row = document.createElement("tr");
+                    let datarow = data[dr];
+                    for(let cell in datarow) {
+                        let cellElement = document.createElement("td");
+                        cellElement.innerHTML = datarow[cell];
+                        row.appendChild(cellElement);
+                    }
+                    tablerows.appendChild(row);
+                }
+            })
+        })
+    })
+});
+</script>
+</head>
+<body>
+    <button id="getdata">Get Data</button>
+    <table border=`"1`">
+        <thead>
+        {HEADER}
+        </thead>
+        <tbody id="rows">
+        </tbody>
+        <tbody>
+    </table>
+</body>
+</html>
+"@;
+
+        $headerString = "";
+        $Headers = $Headers -split ","
+        if($Headers.Length -gt 0) {
+            foreach($header in $Headers) {
+                $headerString += "<th>$header</th>";
+            }
+        }
+
+        $htmlstring = $htmlstring -replace "{HEADER}", $headerString
+        $htmlstring = $htmlstring -replace "{URL}", $Url
+
+        Write-Output $htmlstring;
+    }
 }

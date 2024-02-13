@@ -11,7 +11,7 @@ if(!$relaunched) {
 $host.UI.RawUI.WindowTitle = "Mini Web Server Example";
 
 # First we must import the miniserver module
-Import-Module .\miniserver.psm1 -Force;
+Import-Module ..\..\miniserver.psm1 -Force;
 
 ########################################################################################
 # Define scriptblocks for our routes.
