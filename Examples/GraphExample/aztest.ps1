@@ -28,7 +28,13 @@ $index_Route = {
         $Response
     )
 
-    $output = Get-Content -Path ".\test.html" -Encoding UTF8 -Raw;
+    # You can do something like:
+    # New-MiniServerHtmlSingleQuery -Headers "DisplayName", "UPN", "Id" -Url "http://localhost:9797/az" -Queryparameter "username" | Out-File .\test.html
+    # Then use that file for output
+    # $output = Get-Content -Path ".\test.html" -Encoding UTF8 -Raw;
+
+    # Or you can just generate the html on the fly and output that.
+    $output = New-MiniServerHtmlSingleQuery -Headers "DisplayName", "UPN", "Id" -Url "http://localhost:9797/az" -Queryparameter "username";
 
     $Response.StatusCode = 200;
     $Response.ContentLength64 = $output.Length;
@@ -69,15 +75,24 @@ $az_Route = {
         $Response
     )
     
-    # $input = "";
-    # [System.IO.StreamReader]$sr = [System.IO.StreamReader]::new($Request.InputStream);
-    # $input = $sr.ReadToEnd() | ConvertFrom-Json;
-    # $sr.Close();
+    $input = @{};
+    $output = "";
 
-    # $username = $input.username;
+    # grab the request body and convert to json
+    # we expect: { "username": "someusername" }
+    [System.IO.StreamReader]$sr = [System.IO.StreamReader]::new($Request.InputStream);
+    $input = $sr.ReadToEnd() | ConvertFrom-Json;
+    $sr.Close();
 
+    $username = $input.username;
 
-    $output =  Get-MgUser -Filter "startsWith(DisplayName, 'trey')" | Select-Object -Property DisplayName, UserPrincipalName, Id | ConvertTo-Json
+    $mguser =  Get-MgUser -Filter "startsWith(DisplayName, '$($username)')" | Select-Object -Property DisplayName, UserPrincipalName, Id
+    if($mguser.length -gt 1) {
+        $output = ConvertTo-Json -InputObject $mguser
+    }
+    else {
+        $output = "[ " + (ConvertTo-Json -InputObject $mguser) + " ]";
+    }
 
     $Response.StatusCode = 200;
     $Response.ContentLength64 = $output.Length;

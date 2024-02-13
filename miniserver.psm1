@@ -166,11 +166,15 @@ New-Module -Name PodgeModule -ScriptBlock {
         Return $routes;
     }
 
-    # DO NOT USE YET - STILL WORKING ON THIS
-    function New-MiniServerHtml {
+    # This function is not ready for primetime but works in simple use cases
+    function New-MiniServerHtmlSingleQuery {
         param(
+            [Parameter(Position=0,mandatory=$true)]
             [string[]]$Headers,
-            [string]$Url
+            [Parameter(Position=1,mandatory=$true)]
+            [string]$Url,
+            [Parameter(Position=2,mandatory=$true)]
+            [string]$Queryparameter
         )
 
         $htmlstring = @"
@@ -180,7 +184,17 @@ New-Module -Name PodgeModule -ScriptBlock {
 <script>
 addEventListener("DOMContentLoaded", (event) => {
     document.getElementById("getdata").addEventListener("click", (event) => {
-        fetch("{URL}").then((response) => {
+        let query = document.getElementById("query").value;
+        let tablerows = document.getElementById("rows");
+        tablerows.innerHTML = "";
+
+        fetch("{URL}",{
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ {Queryparameter} : query })
+        }).then((response) => {
             response.json().then((data) => {
                 console.log(data);
                 let tablerows = document.getElementById("rows");
@@ -201,6 +215,7 @@ addEventListener("DOMContentLoaded", (event) => {
 </script>
 </head>
 <body>
+    <input type="text" id="query" name="query" value="">
     <button id="getdata">Get Data</button>
     <table border=`"1`">
         <thead>
@@ -224,6 +239,7 @@ addEventListener("DOMContentLoaded", (event) => {
 
         $htmlstring = $htmlstring -replace "{HEADER}", $headerString
         $htmlstring = $htmlstring -replace "{URL}", $Url
+        $htmlstring = $htmlstring -replace "{Queryparameter}", $Queryparameter
 
         Write-Output $htmlstring;
     }
