@@ -15,7 +15,7 @@ New-Module -Name PodgeModule -ScriptBlock {
     $_currentport = "";
     # Hold our routes, a default route for index has been added for example
     $routes = [Hashtable]::Synchronized( @{
-        # Example hash value is routepath=scripblock:
+        # Example of a route's hash value is routepath=scripblock:
         # "/" = {
         #     param(
         #         $Request,
@@ -29,6 +29,8 @@ New-Module -Name PodgeModule -ScriptBlock {
         #     $sw.Write($output);
         #     $sw.Close();
         # };
+
+        # These 3 built-in endpoints are for supporting the pipeline cmdlets like Out-MiniServerTable
         "/setpspipeline" = {
             param(
                 $Request,
@@ -63,9 +65,18 @@ New-Module -Name PodgeModule -ScriptBlock {
                 [Hashtable]$pipelinedata
             )
 
-            # $input = @{};
-            $output = $pipelinedata.data | ConvertTo-Json;
+            ## TODO: accept parameters for things like sort, filter, etc.
 
+            # $input = @{};
+            $output = "[]";
+            if($pipelinedata.data.Count -lt 2) {
+                $output = "[" +($pipelinedata.data | ConvertTo-Json) + "]";
+            }
+            else{
+                $output = $pipelinedata.data | ConvertTo-Json;
+            }
+
+            # Keep pipelinedata - we'll need another endpoint to clear it on demand
             # $pipelinedata.Remove("data");
         
             # [System.IO.StreamReader]$sr = [System.IO.StreamReader]::new($Request.InputStream);
@@ -266,7 +277,9 @@ New-Module -Name PodgeModule -ScriptBlock {
 
 function getdata() {
     let tablerows = document.getElementById("rows");
+    let tableheader = document.getElementById("header");
     tablerows.innerHTML = "";
+    tableheader.innerHTML = "";
 
     fetch("{URL}",{
         method: "POST",
@@ -277,6 +290,7 @@ function getdata() {
         response.json().then((data) => {
             console.log(data);
             let tablerows = document.getElementById("rows");
+            let tableheader = document.getElementById("header");
             for(let dr in data) {
                 let row = document.createElement("tr");
                 let datarow = data[dr];
@@ -284,8 +298,17 @@ function getdata() {
                     let cellElement = document.createElement("td");
                     cellElement.innerHTML = datarow[cell];
                     row.appendChild(cellElement);
+                    tablerows.appendChild(row);
                 }
-                tablerows.appendChild(row);
+                if(dr == 0) {
+                    let headrow = document.createElement("tr");
+                    for(let cell in datarow) {
+                        let headElement = document.createElement("th");
+                        headElement.innerHTML = cell;
+                        headrow.appendChild(headElement);
+                        tableheader.appendChild(headrow);
+                    }
+                }
             }
         });
     });
@@ -301,6 +324,7 @@ addEventListener("DOMContentLoaded", (event) => {
 <body>
     <button id="getdata">Get Data</button>
     <table border=`"1`">
+        <thead id="header" style="font-weight: bold;">
         <tbody id="rows">
         </tbody>
         <tbody>
@@ -324,6 +348,7 @@ addEventListener("DOMContentLoaded", (event) => {
         Write-Output $htmlstring;
     }
 
+    # Generates html for api request with single query
     function New-MiniServerHtmlSingleQuery {
         param(
             [Parameter(Position=0,mandatory=$true)]
@@ -343,7 +368,10 @@ addEventListener("DOMContentLoaded", (event) => {
     document.getElementById("getdata").addEventListener("click", (event) => {
         let query = document.getElementById("query").value;
         let tablerows = document.getElementById("rows");
+        let tableheader = document.getElementById("header");
+
         tablerows.innerHTML = "";
+        tableheader.innerHTML = "";
 
         fetch("{URL}",{
             method: "POST",
@@ -355,6 +383,8 @@ addEventListener("DOMContentLoaded", (event) => {
             response.json().then((data) => {
                 console.log(data);
                 let tablerows = document.getElementById("rows");
+                let tableheader = document.getElementById("header");
+                // use first row as header
                 for(let dr in data) {
                     let row = document.createElement("tr");
                     let datarow = data[dr];
@@ -362,11 +392,20 @@ addEventListener("DOMContentLoaded", (event) => {
                         let cellElement = document.createElement("td");
                         cellElement.innerHTML = datarow[cell];
                         row.appendChild(cellElement);
+                        tablerows.appendChild(row);
                     }
-                    tablerows.appendChild(row);
+                    if(dr == 0) {
+                        let headrow = document.createElement("tr");
+                        for(let cell in datarow) {
+                            let headElement = document.createElement("th");
+                            headElement.innerHTML = cell;
+                            headrow.appendChild(headElement);
+                            tableheader.appendChild(headrow);
+                        }
+                    }
                 }
             })
-        })
+        }) 
     })
 });
 </script>
@@ -375,7 +414,7 @@ addEventListener("DOMContentLoaded", (event) => {
     <input type="text" id="query" name="query" value="">
     <button id="getdata">Get Data</button>
     <table border=`"1`">
-        <thead>
+        <thead id="header" style="font-weight: bold;">
         {HEADER}
         </thead>
         <tbody id="rows">
@@ -401,7 +440,6 @@ addEventListener("DOMContentLoaded", (event) => {
         Write-Output $htmlstring;
     }
 
-    [System.Collections.ArrayList]$output;
     function Out-MiniServerTable {
         [CmdletBinding()]
         param(
@@ -410,24 +448,31 @@ addEventListener("DOMContentLoaded", (event) => {
         )
         begin {
             $blockdata = [System.Collections.ArrayList]::new();
-            # $total = 0;
         }
         process {
+            $datatype = $InputData[0].GetType()
+            if($datatype -eq [System.Collections.Hashtable]) {
+                # has keys
+                # maybe later I'll create metadata for headers
+                # for now just create headers in javascript
+                # using the property names of the first row.
+            }
             $blockdata.AddRange($InputData) | Out-Null;
-            # Write-Output $InputData;
-            # $total++;
         }
         end {
             # $blockdata | ConvertTo-Json | Write-Output
-            $json = $blockdata | ConvertTo-Json;
-            # $output = [System.Collections.ArrayList]::new() | Out-Null;
-            # Write-Output $total;
+            $json="";
+            if($blockdata.Count -lt 2) {
+                $json = "[" + ($blockdata | ConvertTo-Json) + "]";
+            }
+            else {
+                $json = $blockdata | ConvertTo-Json;
+            }
+            write-Output $json; # allows us to pipe the resulting json to another command
             $setapiurl = "http://$($jobCommands.hostname)`:$($jobCommands.port)/setpspipeline";
-            $getapiurl = "http://$($jobCommands.hostname)`:$($jobCommands.port)/getpspipeline";
             $pipelinetableurl = "http://$($jobCommands.hostname)`:$($jobCommands.port)/pipelinetable";
             Invoke-WebRequest -Method "POST" -Uri "$setapiurl" -Body $json -ContentType "application/json" | Out-Null;
-            #(Invoke-WebRequest -Method "POST" -Uri "$getapiurl" -ContentType "application/json").Content | ConvertFrom-Json;
-            Start-Process $pipelinetableurl
+            Start-Process $pipelinetableurl # should open in default browser
         }
     }
 }
