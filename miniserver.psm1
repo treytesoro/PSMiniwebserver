@@ -11,6 +11,8 @@
 # }
 
 New-Module -Name PodgeModule -ScriptBlock {
+    $_currenthostname = "";
+    $_currentport = "";
     # Hold our routes, a default route for index has been added for example
     $routes = [Hashtable]::Synchronized( @{
         # Example hash value is routepath=scripblock:
@@ -26,7 +28,78 @@ New-Module -Name PodgeModule -ScriptBlock {
         #     [System.IO.StreamWriter]$sw = [System.IO.StreamWriter]::new($Response.OutputStream);
         #     $sw.Write($output);
         #     $sw.Close();
-        # }
+        # };
+        "/setpspipeline" = {
+            param(
+                $Request,
+                $Response,
+                [Hashtable]$pipelinedata
+            )
+
+            $input = @{};
+            $output = '{"status": "ok"}';
+        
+            [System.IO.StreamReader]$sr = [System.IO.StreamReader]::new($Request.InputStream);
+            $input = $sr.ReadToEnd() | ConvertFrom-Json;
+            $sr.Close();
+        
+            $pipelinedata.data = $input;
+
+            $output = $pipelinedata.data | ConvertTo-Json;
+
+            $Response.StatusCode = 200;
+            $Response.ContentLength64 = $output.Length;
+            $Response.ContentType = "application/Json";
+        
+            # Write JSON data to outputstream
+            [System.IO.StreamWriter] $sw = [System.IO.StreamWriter]::new($Response.OutputStream);
+            $sw.Write($output);
+            $sw.Close();
+        };
+        "/getpspipeline" = {
+            param(
+                $Request,
+                $Response,
+                [Hashtable]$pipelinedata
+            )
+
+            # $input = @{};
+            $output = $pipelinedata.data | ConvertTo-Json;
+
+            # $pipelinedata.Remove("data");
+        
+            # [System.IO.StreamReader]$sr = [System.IO.StreamReader]::new($Request.InputStream);
+            # $input = $sr.ReadToEnd() | ConvertFrom-Json;
+            # $sr.Close();
+        
+            # $global:pipelinedata = $input;
+
+            $Response.StatusCode = 200;
+            $Response.ContentLength64 = $output.Length;
+            $Response.ContentType = "application/Json";
+        
+            # Write JSON data to outputstream
+            [System.IO.StreamWriter] $sw = [System.IO.StreamWriter]::new($Response.OutputStream);
+            $sw.Write($output);
+            $sw.Close();
+        };
+        "/pipelinetable" = {
+            param(
+                $Request,
+                $Response
+            )
+    
+            $output = New-MiniServerWebTable -Url "http://localhost:9797/getpspipeline";
+        
+            $Response.StatusCode = 200;
+            $Response.ContentLength64 = $output.Length;
+            $Response.ContentType = "text/html";
+        
+            # Write index content to outputstream
+            [System.IO.StreamWriter] $sw = [System.IO.StreamWriter]::new($Response.OutputStream);
+            $sw.Write($output);
+            $sw.Close();
+        }
     })
 
     $jobCommands = @{
@@ -46,6 +119,9 @@ New-Module -Name PodgeModule -ScriptBlock {
         $jobCommands.hostname = $Hostname;
         $jobCommands.port = $Port;
         $jobCommands.run = $true;
+
+        $_currenthostname = $Hostname;
+        $_currentport = $Port;
 
         # Start the main httplistener and start up 4 listening contexts
         $serverJob = Start-ThreadJob -ScriptBlock {
@@ -72,6 +148,9 @@ New-Module -Name PodgeModule -ScriptBlock {
                 Exit;
             }
 
+            # Temp variable for pipeline data
+            $pipelinedata = [Hashtable]::Synchronized(@{});
+
             $MAXJOBS = 10;
             $jobcount = 0;
 
@@ -80,7 +159,8 @@ New-Module -Name PodgeModule -ScriptBlock {
                     Start-ThreadJob -ScriptBlock {
                         param(
                             [System.Net.HttpListener]$httpListener,
-                            [hashtable]$routes
+                            [Hashtable]$routes,
+                            [Hashtable]$pipelinedata
                         )
                         # Not sure if they are any benefits to async here
                         # since we're waiting. May switch back to synched GetContent()
@@ -105,12 +185,17 @@ New-Module -Name PodgeModule -ScriptBlock {
 
                             # If route is found in our route hash, invoke it's scriptblock.
                             if($key -eq $requestedRoute) {
-                                $routes[$key].Invoke( $context.Request, $context.Response );
+                                if($key -eq "/setpspipeline" -or $key -eq "/getpspipeline") {
+                                    $routes[$key].Invoke( $context.Request, $context.Response, $pipelinedata );
+                                }
+                                else{
+                                    $routes[$key].Invoke( $context.Request, $context.Response );
+                                }
                             }
                         }
                         $context.Response.Close();
 
-                    } -ArgumentList $httpListener, $routes | Out-Null
+                    } -ArgumentList $httpListener, $routes, $pipelinedata | Out-Null
                     $jobcount++;
                 }
 
@@ -167,6 +252,78 @@ New-Module -Name PodgeModule -ScriptBlock {
     }
 
     # This function is not ready for primetime but works in simple use cases
+    function New-MiniServerWebTable {
+        param(
+            [Parameter(Position=0,mandatory=$true)]
+            [string]$Url
+        )
+
+        $htmlstring = @"
+<html>
+<head>
+    <title>Table</title>
+<script>
+
+function getdata() {
+    let tablerows = document.getElementById("rows");
+    tablerows.innerHTML = "";
+
+    fetch("{URL}",{
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        }
+    }).then((response) => {
+        response.json().then((data) => {
+            console.log(data);
+            let tablerows = document.getElementById("rows");
+            for(let dr in data) {
+                let row = document.createElement("tr");
+                let datarow = data[dr];
+                for(let cell in datarow) {
+                    let cellElement = document.createElement("td");
+                    cellElement.innerHTML = datarow[cell];
+                    row.appendChild(cellElement);
+                }
+                tablerows.appendChild(row);
+            }
+        });
+    });
+}
+addEventListener("DOMContentLoaded", (event) => {
+    document.getElementById("getdata").addEventListener("click", (event) => {
+        getdata();
+    })
+    getdata();
+});
+</script>
+</head>
+<body>
+    <button id="getdata">Get Data</button>
+    <table border=`"1`">
+        <tbody id="rows">
+        </tbody>
+        <tbody>
+    </table>
+</body>
+</html>
+"@;
+
+        ## TODO: Figure out a header strategy for pipelinetable
+        # $headerString = "";
+        # $Headers = $Headers -split ","
+        # if($Headers.Length -gt 0) {
+        #     foreach($header in $Headers) {
+        #         $headerString += "<th>$header</th>";
+        #     }
+        # }
+
+        # $htmlstring = $htmlstring -replace "{HEADER}", $headerString
+        $htmlstring = $htmlstring -replace "{URL}", $Url
+
+        Write-Output $htmlstring;
+    }
+
     function New-MiniServerHtmlSingleQuery {
         param(
             [Parameter(Position=0,mandatory=$true)]
@@ -242,5 +399,35 @@ addEventListener("DOMContentLoaded", (event) => {
         $htmlstring = $htmlstring -replace "{Queryparameter}", $Queryparameter
 
         Write-Output $htmlstring;
+    }
+
+    [System.Collections.ArrayList]$output;
+    function Out-MiniServerTable {
+        [CmdletBinding()]
+        param(
+            [Parameter(Position=0,mandatory=$true,ValueFromPipeline=$true)]
+            [Array]$InputData
+        )
+        begin {
+            $blockdata = [System.Collections.ArrayList]::new();
+            # $total = 0;
+        }
+        process {
+            $blockdata.AddRange($InputData) | Out-Null;
+            # Write-Output $InputData;
+            # $total++;
+        }
+        end {
+            # $blockdata | ConvertTo-Json | Write-Output
+            $json = $blockdata | ConvertTo-Json;
+            # $output = [System.Collections.ArrayList]::new() | Out-Null;
+            # Write-Output $total;
+            $setapiurl = "http://$($jobCommands.hostname)`:$($jobCommands.port)/setpspipeline";
+            $getapiurl = "http://$($jobCommands.hostname)`:$($jobCommands.port)/getpspipeline";
+            $pipelinetableurl = "http://$($jobCommands.hostname)`:$($jobCommands.port)/pipelinetable";
+            Invoke-WebRequest -Method "POST" -Uri "$setapiurl" -Body $json -ContentType "application/json" | Out-Null;
+            #(Invoke-WebRequest -Method "POST" -Uri "$getapiurl" -ContentType "application/json").Content | ConvertFrom-Json;
+            Start-Process $pipelinetableurl
+        }
     }
 }
