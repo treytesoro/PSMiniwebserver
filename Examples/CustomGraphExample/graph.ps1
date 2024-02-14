@@ -11,7 +11,7 @@ if(!$relaunched) {
 # Let's test some Azure cmdlet stuff
 # Connect-AzAccount # only need this once
 # Connect-MgGraph
-Connect-MgGraph -ClientId b140cedd-0cfe-4246-b4a3-938384cd10ce -TenantId 018402d8-1aee-421c-8768-e93413f2d9b8
+
 
 $host.UI.RawUI.WindowTitle = "Mini Web Server Example";
 
