@@ -3,6 +3,8 @@ Cmdlets to control a .Net HttpListener web server
 
 ## How TO:
 
+[Check out my blog for more information on how to use this module.](https://idevudev.blogspot.com/2024/02/super-simple-powershell-webserver.html)
+
 ### Starting server
 
 Start-MiniServer -Hostname "\<hostname\>" -port "\<port\>"

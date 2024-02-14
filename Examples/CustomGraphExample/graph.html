@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<!--[if lt IE 7]>      <html class="no-js lt-ie9 lt-ie8 lt-ie7"> <![endif]-->
+<!--[if IE 7]>         <html class="no-js lt-ie9 lt-ie8"> <![endif]-->
+<!--[if IE 8]>         <html class="no-js lt-ie9"> <![endif]-->
+<!--[if gt IE 8]>      <html class="no-js"> <!--<![endif]-->
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <title></title>
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="stylesheet" href="">
+        <style>
+            * {
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            }
+        </style>
+        <script>
+            const baseurl = 'http://localhost:9797';
+
+            addEventListener("DOMContentLoaded", (event) => {
+                
+            });
+            function ConnectGraph() {
+                fetch(baseurl + '/connectgraph',{
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ clientid : document.getElementById("clientid").value, tenantid : document.getElementById("tenantid").value })
+                }).then((response) => {
+                    response.json().then((data) => {
+                        console.log(data);
+                    });
+                });
+            }
+
+            function InvokeGraph() {
+                let tablerows = document.getElementById("rows");
+                let tableheader = document.getElementById("header");
+                tableheader.innerHTML = "";
+                tablerows.innerHTML = "";
+
+                fetch(baseurl + '/invokegraph',{
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"                        
+                    },
+                    body: JSON.stringify({ graphurl : document.getElementById("graphurl").value })
+                }).then((response) => {
+                    response.json().then((data) => {
+                        console.log(data);
+                        
+                        let tablerows = document.getElementById("rows");
+                        let tableheader = document.getElementById("header");
+                        for(let dr in data.value) {
+                            let row = document.createElement("tr");
+                            let datarow = data.value[dr];
+                            for(let cell in datarow) {
+                                let cellElement = document.createElement("td");
+                                cellElement.innerHTML = datarow[cell];
+                                row.appendChild(cellElement);
+                                tablerows.appendChild(row);
+                            }
+                            if(dr == 0) {
+                                let headrow = document.createElement("tr");
+                                for(let cell in datarow) {
+                                    let headElement = document.createElement("th");
+                                    headElement.innerHTML = cell;
+                                    headrow.appendChild(headElement);
+                                    tableheader.appendChild(headrow);
+                                }
+                            }
+                        }
+                    })
+                })
+            }
+        </script>
+    </head>
+    <body>
+        <!--[if lt IE 7]>
+            <p class="browsehappy">You are using an <strong>outdated</strong> browser. Please <a href="#">upgrade your browser</a> to improve your experience.</p>
+        <![endif]-->
+        <div>
+            <p>You can change graph.ps1 and add/update the Connect-MgGraph with specific ClientID and TenantID</p>
+            <p>You can also connect a with a specific Graph ClientID and TenantID here:</p>
+            <div class="inputline"><label for="clientid">ClientID: </label><input type="text" id="clientid"/></div>
+            <div class="inputline"><label for="tenantid">TenantID: </label><input type="text" id="tenantid"/></div>
+            <button onclick="ConnectGraph()">Connect Graph</button>
+        </div>
+        <hr/>
+        <div>
+            <code>
+                <h4>Examples graph query URLs:</h4><br/>
+                Managed Device with filter:<br/>
+                https://graph.microsoft.com/v1.0/deviceManagement/managedDevices?$filter=complianceState eq 'compliant' and userPrincipalName eq 'johndoe@companyname.com'&$select=userDisplayName,userPrincipalName,deviceName&$top=5<br/>
+                <br/>
+                Users with filter:<br/>
+                https://graph.microsoft.com/v1.0/users?$filter=userPrincipalName eq 'johndoe@companyname.com'<br/>
+            </code>
+            <br/>
+            <br/>
+            <p>Enter graph url:</p>
+            <div class="inputline"><label for="graphurl"></label>
+                <textarea type="text" id="graphurl" style="width:200pt;height:100pt"></textarea>
+            </div>
+            <button onclick="InvokeGraph()">Invoke Graph</button>
+        </div>
+
+        <div>
+            <h4>Results:</h4>
+            <div style="overflow: auto;">
+                <table border="1">
+                    <thead id="header" style="font-weight: bold;">
+                    <tbody id="rows">
+                    </tbody>
+                    <tbody>
+                </table>
+            </div>
+        </div>
+        <script src="" async defer></script>
+    </body>
+</html>

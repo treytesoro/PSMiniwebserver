@@ -36,11 +36,11 @@ $index_Route = {
     # New-MiniServerHtmlSingleQuery -Headers "DisplayName", "UPN", "Id" -Url "http://localhost:9797/az" -Queryparameter "username" | Out-File .\test.html
     
     # Then use that file for output
-    # $output = Get-Content -Path ".\test.html" -Encoding UTF8 -Raw;
+    $output = Get-Content -Path ".\graph.html" -Encoding UTF8 -Raw;
 
     # Or you can just generate the html on the fly and output that.
      # http://localhost:9797/az URL, represented by $az_Route scripblock, expects "username" for its query.
-    $output = New-MiniServerHtmlSingleQuery -Headers "DisplayName", "UPN", "Id" -Url "http://localhost:9797/az" -Queryparameter "username";
+    # $output = New-MiniServerHtmlSingleQuery -Headers "DisplayName", "UPN", "Id" -Url "http://localhost:9797/az" -Queryparameter "username";
 
     $Response.StatusCode = 200;
     $Response.ContentLength64 = $output.Length;
@@ -90,9 +90,69 @@ $az_Route = {
     $sw.Close();
 }
 
+$connectGraph_Route = {
+    param(
+        $Request,
+        $Response
+    )
+
+    $input = @{};
+    # grab the request body and convert to json
+    [System.IO.StreamReader]$sr = [System.IO.StreamReader]::new($Request.InputStream);
+    $input = $sr.ReadToEnd() | ConvertFrom-Json;
+    $sr.Close();
+
+    $clientid = $input.clientid;
+    $tenantid = $input.tenantid;
+
+    Connect-MgGraph -ClientId $clientid -TenantId $tenantid
+
+    $output = '{"status": "Connected"}';
+    $Response.StatusCode = 200;
+    $Response.ContentLength64 = $output.Length;
+    $Response.ContentType = "application/Json";
+
+    # Write JSON data to outputstream
+    [System.IO.StreamWriter] $sw = [System.IO.StreamWriter]::new($Response.OutputStream);
+    $sw.Write($output);
+    $sw.Close();
+}
+
+$invokegraph_Route = {
+    param(
+        $Request,
+        $Response
+    )
+    
+    $input = @{};
+    $output = "";
+
+    # grab the request body and convert to json
+    # we expect: { "username": "someusername" }
+    [System.IO.StreamReader]$sr = [System.IO.StreamReader]::new($Request.InputStream);
+    $input = $sr.ReadToEnd() | ConvertFrom-Json;
+    $sr.Close();
+
+    $graphurl = $input.graphurl;
+
+    $graphurl = [URI]::EscapeUriString($graphurl);
+    $output = (Invoke-MgGraphRequest -Method GET -Uri $graphurl | ConvertTo-Json -Depth 10);
+    
+    $Response.StatusCode = 200;
+    $Response.ContentLength64 = $output.Length;
+    $Response.ContentType = "application/Json";
+
+    # Write JSON data to outputstream
+    [System.IO.StreamWriter] $sw = [System.IO.StreamWriter]::new($Response.OutputStream);
+    $sw.Write($output);
+    $sw.Close();
+}
+
 # Register web server routes
 Set-MiniServerRoute -RoutePath "/" -ScriptBlock $index_Route;
 Set-MiniServerRoute -RoutePath "/az" -ScriptBlock $az_Route;
+Set-MiniServerRoute -RoutePath "/connectgraph" -ScriptBlock $connectGraph_Route;
+Set-MiniServerRoute -RoutePath "/invokegraph" -ScriptBlock $invokegraph_Route;
 
 # Start the web server
 Start-MiniServer -Hostname "localhost" -Port "9797";
