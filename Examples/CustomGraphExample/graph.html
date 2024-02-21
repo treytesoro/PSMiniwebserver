@@ -15,12 +15,64 @@
             * {
                 font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             }
+
+            #mgcontext {
+                display: flex;
+                flex-direction: row;
+                align-items: center;
+                justify-content: center;
+                gap: 20px;
+                padding: 20px;
+                position: relative;
+                align-items: stretch;
+            }
+
+            .mgcChild {
+                width: 50%;
+                max-height: 300px;
+                overflow-y: scroll;
+                background-color: lightgray;
+                border-radius: 10px;
+                flex-grow: 4;
+                padding: 20px;
+            }
+
+            .inputline label {
+                display: inline-block;
+                min-width: 100px;
+                text-align: right;
+                padding: 4px
+            }
+
+            .inputline input[type=text] {
+                display: inline-block;
+                width: 200px;
+                padding: 4px;
+                border-radius: 6px;
+                border: 1px solid gray;
+            }
+
+            button {
+                border: 1px solid gray;
+                border-radius: 30px;
+                padding: 6px 10px;
+                background-color: white;
+                cursor: pointer;
+                font-weight: bold;
+                color: gray;
+                font-size: 16px;
+            }
+            button:hover {
+                transition: all 0.2s ease-in-out;
+                background-color: rgb(180, 162, 189);
+                color: white;
+            }
         </style>
         <script>
             const baseurl = 'http://localhost:9797';
 
             addEventListener("DOMContentLoaded", (event) => {
-                
+                GetMgContext();
             });
             function ConnectGraph() {
                 fetch(baseurl + '/connectgraph',{
@@ -32,6 +84,7 @@
                 }).then((response) => {
                     response.json().then((data) => {
                         console.log(data);
+                        GetMgContext();
                     });
                 });
             }
@@ -76,18 +129,45 @@
                     })
                 })
             }
+        
+            function GetMgContext() {
+                let scopeElem = document.getElementById("scopes");
+                scopeElem.innerHTML = "";
+                fetch(baseurl + '/getmgcontext').then((response) => {
+                    response.json().then((data) => {
+                        //console.log(data);
+                        let scopeElem = document.getElementById("scopes");
+                        for(let s of data.Scopes){
+                            //console.log(s);
+                            let newdiv = document.createElement("div");
+                            newdiv.innerText = s;
+                            scopeElem.appendChild(newdiv);
+                        }
+                    });
+                });
+            }
         </script>
     </head>
     <body>
+        <img src="lwseditor.png" />
         <!--[if lt IE 7]>
             <p class="browsehappy">You are using an <strong>outdated</strong> browser. Please <a href="#">upgrade your browser</a> to improve your experience.</p>
         <![endif]-->
-        <div>
-            <p>You can change graph.ps1 and add/update the Connect-MgGraph with specific ClientID and TenantID</p>
-            <p>You can also connect a with a specific Graph ClientID and TenantID here:</p>
-            <div class="inputline"><label for="clientid">ClientID: </label><input type="text" id="clientid"/></div>
-            <div class="inputline"><label for="tenantid">TenantID: </label><input type="text" id="tenantid"/></div>
-            <button onclick="ConnectGraph()">Connect Graph</button>
+        <div id="mgcontext">
+            <div class="mgcChild">
+                <p>You can change graph.ps1 and add/update the Connect-MgGraph with specific ClientID and TenantID</p>
+                <p>You can also connect a with a specific Graph ClientID and TenantID here:</p>
+                <div class="inputline"><label for="clientid">ClientID: </label><input type="text" id="clientid"/></div>
+                <div class="inputline"><label for="tenantid">TenantID: </label><input type="text" id="tenantid"/></div>
+                <hr/>
+                <button onclick="ConnectGraph()">Connect Graph</button>
+            </div>
+            <div class="mgcChild">
+                <h2>Current authorized scopes:</h2>
+                <div id="scopes">
+
+                </div>
+            </div>
         </div>
         <hr/>
         <div>

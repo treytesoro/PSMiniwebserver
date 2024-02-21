@@ -1,6 +1,10 @@
 param (
     [bool]$relaunched
 )
+[console]::WindowWidth=100; 
+[console]::WindowHeight=20; 
+[console]::BufferWidth=[console]::WindowWidth
+
 Set-Location $PSScriptRoot
 if(!$relaunched) {
     Write-Host "Relaunching...";
@@ -11,7 +15,6 @@ if(!$relaunched) {
 # Let's test some Azure cmdlet stuff
 # Connect-AzAccount # only need this once
 # Connect-MgGraph
-
 
 $host.UI.RawUI.WindowTitle = "Mini Web Server Example";
 
@@ -105,7 +108,12 @@ $connectGraph_Route = {
     $clientid = $input.clientid;
     $tenantid = $input.tenantid;
 
-    Connect-MgGraph -ClientId $clientid -TenantId $tenantid
+    if($clientid.length -eq 0 -or $tenantid.length -eq 0) {
+        Connect-MgGraph;
+    }
+    else{
+        Connect-MgGraph -ClientId $clientid -TenantId $tenantid;
+    }
 
     $output = '{"status": "Connected"}';
     $Response.StatusCode = 200;
@@ -148,14 +156,39 @@ $invokegraph_Route = {
     $sw.Close();
 }
 
+$getmgcontext_Route = {
+    param(
+        $Request,
+        $Response
+    )
+
+    $output = ""
+
+    $mgctx = Get-MgContext;
+
+    $output = $mgctx | ConvertTo-Json;
+
+    $Response.StatusCode = 200;
+    $Response.ContentLength64 = $output.Length;
+    $Response.ContentType = "application/Json";
+
+    # Write JSON data to outputstream
+    [System.IO.StreamWriter] $sw = [System.IO.StreamWriter]::new($Response.OutputStream);
+    $sw.Write($output);
+    $sw.Close();
+}
+
 # Register web server routes
 Set-MiniServerRoute -RoutePath "/" -ScriptBlock $index_Route;
 Set-MiniServerRoute -RoutePath "/az" -ScriptBlock $az_Route;
 Set-MiniServerRoute -RoutePath "/connectgraph" -ScriptBlock $connectGraph_Route;
 Set-MiniServerRoute -RoutePath "/invokegraph" -ScriptBlock $invokegraph_Route;
+Set-MiniServerRoute -RoutePath "/getmgcontext" -ScriptBlock $getmgcontext_Route;
+$fullPathToStaticFiles = "<full path to static files you want to serve (images, scripts, stylesheets, etc.)>";
+Set-MiniServerStaticRoutes -StaticRoute "/static" -LocalPath $fullPathToStaticFiles;
 
 # Start the web server
 Start-MiniServer -Hostname "localhost" -Port "9797";
 
 # Open url in default browser
-Start-Process "http://localhost:9797"
+Start-Process "http://localhost:9797";
